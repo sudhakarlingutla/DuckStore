@@ -1,0 +1,5 @@
+# Shell scripts run inside Linux containers, so they must keep LF endings
+# even when the repository is checked out on Windows.
+* text=auto eol=lf
+*.png binary
+*.ico binary

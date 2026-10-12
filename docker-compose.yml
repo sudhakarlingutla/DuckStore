@@ -1,0 +1,22 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_local_only}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-duckstore}
+      MYSQL_TEST_DATABASE: ${MYSQL_TEST_DATABASE:-duckstore_test}
+      MYSQL_USER: ${MYSQL_USER:-duck}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-duck_local_only}
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql-data:

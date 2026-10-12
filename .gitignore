@@ -1,0 +1,26 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor and OS state
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# AI assistant state
+.claude/
+.cursor/
+.aider*
