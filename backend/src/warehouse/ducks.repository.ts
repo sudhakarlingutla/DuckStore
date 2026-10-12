@@ -4,6 +4,7 @@ import type { Color } from '../common/color.js';
 import { Money } from '../common/money.js';
 import type { Size } from '../common/size.js';
 import { DB_POOL } from '../database/database.module.js';
+import type { StockReader } from './stock-reader.js';
 import { hasMysqlCode, retryOnDeadlock } from '../database/mysql-errors.js';
 import type { Duck, DuckChanges, IncomingStock } from './duck.js';
 import {
@@ -51,7 +52,7 @@ export interface AddResult {
 
 /** All SQL for the ducks table lives here. */
 @Injectable()
-export class DucksRepository {
+export class DucksRepository implements StockReader {
   constructor(@Inject(DB_POOL) private readonly pool: Pool) {}
 
   /** Active ducks, largest stock first; equal stock is ordered by id. */
@@ -60,6 +61,15 @@ export class DucksRepository {
       `SELECT ${DUCK_COLUMNS} FROM ducks
         WHERE deleted = FALSE
         ORDER BY quantity DESC, id ASC`,
+    );
+    return rows.map(toDuck);
+  }
+
+  async findActiveByColorAndSize(color: Color, size: Size): Promise<Duck[]> {
+    const [rows] = await this.pool.execute<DuckRow[]>(
+      `SELECT ${DUCK_COLUMNS} FROM ducks
+        WHERE color = ? AND size = ? AND deleted = FALSE`,
+      [color, size],
     );
     return rows.map(toDuck);
   }
