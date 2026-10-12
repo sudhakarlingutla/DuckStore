@@ -1,9 +1,7 @@
+import { WarehousePage } from './pages/WarehousePage.tsx'
+
 function App() {
-  return (
-    <main className="page">
-      <h1>Duck Warehouse</h1>
-    </main>
-  )
+  return <WarehousePage />
 }
 
 export default App

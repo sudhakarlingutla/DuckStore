@@ -80,3 +80,10 @@ async function toApiError(response: Response): Promise<ApiError> {
     `The server gave an unexpected answer (status ${response.status}).`,
   )
 }
+
+/** The text to show a person for any thrown value. */
+export function errorMessage(error: unknown): string {
+  return error instanceof ApiError
+    ? error.message
+    : 'Something unexpected went wrong. Please try again.'
+}
