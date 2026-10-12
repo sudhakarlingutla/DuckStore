@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { Duck, IncomingStock } from './duck.js';
+import type { Duck, DuckChanges, IncomingStock } from './duck.js';
+import { DuckNotFoundError, StaleVersionError } from './duck-errors.js';
 import { AddResult, DucksRepository } from './ducks.repository.js';
 
 @Injectable()
@@ -18,5 +19,31 @@ export class DucksService {
    */
   add(stock: IncomingStock): Promise<AddResult> {
     return this.ducks.addOrMerge(stock);
+  }
+
+  /**
+   * Changes the price and/or quantity of a duck. The caller states which
+   * version of the duck it was looking at; if the duck has changed since
+   * (for example stock was added), the edit is refused instead of
+   * overwriting that change.
+   */
+  async edit(
+    id: number,
+    expectedVersion: number,
+    changes: DuckChanges,
+  ): Promise<Duck> {
+    const applied = await this.ducks.updateIfUnchanged(
+      id,
+      expectedVersion,
+      changes,
+    );
+    const duck = await this.ducks.findActiveById(id);
+    if (!duck) {
+      throw new DuckNotFoundError(id);
+    }
+    if (!applied) {
+      throw new StaleVersionError();
+    }
+    return duck;
   }
 }

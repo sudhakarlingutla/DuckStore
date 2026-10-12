@@ -1,9 +1,21 @@
-import { Body, Controller, Get, HttpStatus, Post, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
+import { ValidationError } from '../common/errors/domain-error.js';
 import { Money } from '../common/money.js';
 import { DucksService } from './ducks.service.js';
 import { CreateDuckDto } from './dto/create-duck.dto.js';
 import { DuckResponse, toDuckResponse } from './dto/duck.response.js';
+import { UpdateDuckDto } from './dto/update-duck.dto.js';
 
 @Controller('ducks')
 export class DucksController {
@@ -28,6 +40,24 @@ export class DucksController {
       quantity: body.quantity,
     });
     response.status(created ? HttpStatus.CREATED : HttpStatus.OK);
+    return toDuckResponse(duck);
+  }
+
+  @Patch(':id')
+  async edit(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateDuckDto,
+  ): Promise<DuckResponse> {
+    if (body.price === undefined && body.quantity === undefined) {
+      throw new ValidationError([
+        { field: 'price', message: 'Send a price, a quantity, or both.' },
+      ]);
+    }
+    const duck = await this.ducks.edit(id, body.version, {
+      price:
+        body.price === undefined ? undefined : Money.fromNumber(body.price),
+      quantity: body.quantity,
+    });
     return toDuckResponse(duck);
   }
 }

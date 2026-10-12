@@ -5,8 +5,11 @@ import { Money } from '../common/money.js';
 import type { Size } from '../common/size.js';
 import { DB_POOL } from '../database/database.module.js';
 import { hasMysqlCode, retryOnDeadlock } from '../database/mysql-errors.js';
-import type { Duck, IncomingStock } from './duck.js';
-import { StockLimitExceededError } from './duck-errors.js';
+import type { Duck, DuckChanges, IncomingStock } from './duck.js';
+import {
+  DuckPriceConflictError,
+  StockLimitExceededError,
+} from './duck-errors.js';
 
 const DUCK_COLUMNS = 'id, color, size, price, quantity, version';
 
@@ -59,6 +62,52 @@ export class DucksRepository {
         ORDER BY quantity DESC, id ASC`,
     );
     return rows.map(toDuck);
+  }
+
+  async findActiveById(id: number): Promise<Duck | undefined> {
+    const [rows] = await this.pool.execute<DuckRow[]>(
+      `SELECT ${DUCK_COLUMNS} FROM ducks WHERE id = ? AND deleted = FALSE`,
+      [id],
+    );
+    return rows[0] ? toDuck(rows[0]) : undefined;
+  }
+
+  /**
+   * Applies the changes only if the duck is active and still at the version
+   * the caller saw. The version check and the write are one statement, so a
+   * change made in between can never be silently overwritten.
+   * Returns whether the changes were applied.
+   */
+  async updateIfUnchanged(
+    id: number,
+    expectedVersion: number,
+    changes: DuckChanges,
+  ): Promise<boolean> {
+    try {
+      const [result] = await retryOnDeadlock(() =>
+        this.pool.execute<ResultSetHeader>(
+          `UPDATE ducks
+              SET price    = COALESCE(?, price),
+                  quantity = COALESCE(?, quantity),
+                  version  = version + 1
+            WHERE id = ? AND version = ? AND deleted = FALSE`,
+          [
+            changes.price?.toDecimalString() ?? null,
+            changes.quantity ?? null,
+            id,
+            expectedVersion,
+          ],
+        ),
+      );
+      return result.affectedRows === 1;
+    } catch (error) {
+      // The unique index refused the new price: another active duck of the
+      // same color and size already has it.
+      if (hasMysqlCode(error, 'ER_DUP_ENTRY')) {
+        throw new DuckPriceConflictError();
+      }
+      throw error;
+    }
   }
 
   async addOrMerge(stock: IncomingStock): Promise<AddResult> {
