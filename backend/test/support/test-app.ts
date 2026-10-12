@@ -9,6 +9,9 @@ import { testConfig } from './test-database.js';
 /**
  * Starts the real application, configured as in production but pointed at
  * the test database. Extra controllers can be added for test-only routes.
+ *
+ * It listens on a free port so that many requests can be in flight at once,
+ * which the concurrency tests rely on.
  */
 export async function createTestApp(
   extraControllers: Type[] = [],
@@ -23,6 +26,6 @@ export async function createTestApp(
 
   const app = moduleRef.createNestApplication<INestApplication<App>>();
   configureApp(app);
-  await app.init();
+  await app.listen(0);
   return app;
 }
