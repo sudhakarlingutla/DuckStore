@@ -46,4 +46,12 @@ export class DucksService {
     }
     return duck;
   }
+
+  /** Logically deletes a duck. It stays in the database but is never listed. */
+  async delete(id: number): Promise<void> {
+    const deleted = await this.ducks.markDeleted(id);
+    if (!deleted) {
+      throw new DuckNotFoundError(id);
+    }
+  }
 }

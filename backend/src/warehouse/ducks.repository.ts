@@ -110,6 +110,22 @@ export class DucksRepository {
     }
   }
 
+  /**
+   * Logical delete: the row stays, flagged as deleted. Returns false when
+   * there was no active duck with that id.
+   */
+  async markDeleted(id: number): Promise<boolean> {
+    const [result] = await retryOnDeadlock(() =>
+      this.pool.execute<ResultSetHeader>(
+        `UPDATE ducks
+            SET deleted = TRUE, version = version + 1
+          WHERE id = ? AND deleted = FALSE`,
+        [id],
+      ),
+    );
+    return result.affectedRows === 1;
+  }
+
   async addOrMerge(stock: IncomingStock): Promise<AddResult> {
     const result = await this.runAddOrMerge(stock);
     const [rows] = await this.pool.execute<DuckRow[]>(
