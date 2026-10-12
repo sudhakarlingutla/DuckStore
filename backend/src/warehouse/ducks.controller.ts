@@ -1,4 +1,4 @@
-import { Body, Controller, HttpStatus, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Post, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { Money } from '../common/money.js';
 import { DucksService } from './ducks.service.js';
@@ -8,6 +8,12 @@ import { DuckResponse, toDuckResponse } from './dto/duck.response.js';
 @Controller('ducks')
 export class DucksController {
   constructor(private readonly ducks: DucksService) {}
+
+  @Get()
+  async list(): Promise<DuckResponse[]> {
+    const ducks = await this.ducks.list();
+    return ducks.map(toDuckResponse);
+  }
 
   /** 201 when a new duck was created, 200 when it was merged into one. */
   @Post()

@@ -51,6 +51,16 @@ export interface AddResult {
 export class DucksRepository {
   constructor(@Inject(DB_POOL) private readonly pool: Pool) {}
 
+  /** Active ducks, largest stock first; equal stock is ordered by id. */
+  async findAllActive(): Promise<Duck[]> {
+    const [rows] = await this.pool.execute<DuckRow[]>(
+      `SELECT ${DUCK_COLUMNS} FROM ducks
+        WHERE deleted = FALSE
+        ORDER BY quantity DESC, id ASC`,
+    );
+    return rows.map(toDuck);
+  }
+
   async addOrMerge(stock: IncomingStock): Promise<AddResult> {
     const result = await this.runAddOrMerge(stock);
     const [rows] = await this.pool.execute<DuckRow[]>(
