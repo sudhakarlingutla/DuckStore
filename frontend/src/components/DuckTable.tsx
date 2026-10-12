@@ -2,11 +2,12 @@ import { formatPrice, type Duck } from '../domain/duck.ts'
 
 interface DuckTableProps {
   ducks: Duck[]
+  onEdit: (duck: Duck) => void
   onDelete: (duck: Duck) => void
 }
 
 /** The warehouse listing. Rows arrive already sorted by the API. */
-export function DuckTable({ ducks, onDelete }: DuckTableProps) {
+export function DuckTable({ ducks, onEdit, onDelete }: DuckTableProps) {
   if (ducks.length === 0) {
     return (
       <p className="empty">
@@ -40,6 +41,17 @@ export function DuckTable({ ducks, onDelete }: DuckTableProps) {
             <td className="numeric">{formatPrice(duck.price)}</td>
             <td className="numeric">{duck.quantity}</td>
             <td>
+              <button
+                type="button"
+                className="button-link"
+                aria-label={`Edit duck ${duck.id}`}
+                onClick={() => onEdit(duck)}
+              >
+                edit
+              </button>
+              <span className="action-separator" aria-hidden="true">
+                /
+              </span>
               <button
                 type="button"
                 className="button-link button-link-danger"
