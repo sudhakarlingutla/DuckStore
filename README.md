@@ -27,7 +27,10 @@ If a port is taken, copy `.env.example` to `.env` and change it there.
 
 ### Run it without Docker for the app (development)
 
-You need Node.js 22 or newer. MySQL still runs in Docker.
+You need Node.js 22.12 or newer. MySQL still runs in Docker.
+
+If the full application is running in Docker, stop its API and UI first so
+port 3000 is free: `docker compose stop backend frontend`.
 
 ```
 docker compose up -d mysql
@@ -59,6 +62,10 @@ npm test               # component and form tests
 
 The database tests use a separate database, `duckstore_test`, which the MySQL
 container creates on first start. They never touch the application's data.
+
+The database tests print one red `ERROR ... password=hunter2` log line. That is
+expected: a test crashes a route on purpose to check that the response does not
+leak the cause. The summary line at the end shows whether the tests passed.
 
 What the tests are there to prove:
 
