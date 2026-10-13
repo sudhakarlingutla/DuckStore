@@ -3,42 +3,110 @@
 A small warehouse application and an order-pricing API for a shop that sells rubber ducks.
 
 - **Warehouse** — create, list, edit and logically delete ducks, with a web UI.
-- **Store** — one REST endpoint that prices an order and decides its packaging.
+- **Store** — one REST endpoint that prices an order and decides its packaging. No UI, as the brief asks.
 
 Stack: React (Vite, TypeScript), NestJS, MySQL 8.
 
-> This README grows with the project. Sections are filled in as each part is built.
-
-## Prerequisites
-
-- Docker with Docker Compose
-- Node.js 22 or newer
-
 ## Run it
 
+You need Docker with Docker Compose. From the repository root:
+
 ```
-docker compose up -d mysql          # MySQL on host port 3307
+docker compose up --build
+```
+
+| What | Where |
+|---|---|
+| Web UI | http://localhost:8080 |
+| API | http://localhost:3000/api |
+| MySQL | localhost:3307 (user `duck`, password `duck_local_only`, database `duckstore`) |
+
+The database schema is created automatically when the API container starts.
+If a port is taken, copy `.env.example` to `.env` and change it there.
+`docker compose down -v` stops everything and deletes the data.
+
+### Run it without Docker for the app (development)
+
+You need Node.js 22 or newer. MySQL still runs in Docker.
+
+```
+docker compose up -d mysql
 
 cd backend
 npm install
-npm run migrate                     # creates the ducks table
-npm run start                       # API on http://localhost:3000/api
-```
+npm run migrate        # creates the ducks table
+npm run start:dev      # API on http://localhost:3000/api
 
-To change ports or the local passwords, copy `.env.example` to `.env` (for
-Docker) and `backend/.env.example` to `backend/.env` (for the API). The
-defaults work together without either file.
+cd ../frontend         # in a second terminal
+npm install
+npm run dev            # UI on http://localhost:5173, forwards /api to the API
+```
 
 ## Run the tests
 
 ```
+docker compose up -d mysql
+
 cd backend
-npm test                            # unit tests, no database needed
-npm run test:e2e                    # HTTP and database tests, need MySQL running
+npm install
+npm test               # unit tests: money, packaging, pricing, price selection
+npm run test:e2e       # HTTP and database tests against real MySQL
+
+cd ../frontend
+npm install
+npm test               # component and form tests
 ```
 
 The database tests use a separate database, `duckstore_test`, which the MySQL
 container creates on first start. They never touch the application's data.
+
+What the tests are there to prove:
+
+- **The merge rule survives concurrency.** 50 simultaneous adds of the same
+  duck leave exactly one record holding the full quantity
+  (`backend/test/warehouse-add.e2e-spec.ts`), and the database itself refuses a
+  duplicate active duck (`backend/test/ducks-schema.e2e-spec.ts`).
+- **A stale edit cannot overwrite newer stock**
+  (`backend/test/warehouse-edit.e2e-spec.ts`).
+- **Pricing is right to the cent.** Hand-worked totals, the 100/101 and
+  1000/1001 boundaries, half-cent rounding, and for every combination of
+  package, destination, mode and order size the breakdown adds up to the total
+  (`backend/src/store/pricing/pricing-engine.spec.ts`).
+- **Packaging** is checked against the full size x shipping-mode table.
+- **Every invalid input is rejected** with the failing field named, and
+  changes nothing.
+
+## How it is organised
+
+```
+backend/src
+  common/        Money (whole cents), Color, Size, the error format
+  database/      connection, migration runner
+  warehouse/     controller -> service -> repository (all SQL in one file)
+                 stock-reader.ts: the read-only view other modules may use
+  store/         controller -> order-pricing.service (orchestrates)
+    price-selection.ts   which warehouse record an order is priced from
+    packaging/           package by size, protection by shipping mode
+    pricing/             the engine and one file per rule
+frontend/src
+  api/           the only code that talks HTTP
+  domain/        duck types, form validation
+  hooks/         useDucks: loading the listing
+  components/    DuckTable, DuckForm (add and edit), ConfirmDialog, Modal, Field, Notice
+  pages/         WarehousePage
+```
+
+- **The store depends on the warehouse through one read-only interface**
+  (`StockReader`). The warehouse knows nothing about the store.
+- **Packaging and pricing are plain functions** with no database, HTTP or
+  framework in them, so they are tested with plain inputs and outputs.
+- **Packaging uses the Strategy pattern**: one protection strategy per shipping
+  mode, looked up by mode.
+- **Pricing is a pipeline of rules.** Each rule is a small function that
+  returns the charges it applies; the engine runs them in order and keeps the
+  running total. A new rule is a new file plus one line in the rule list.
+- **Business code throws domain errors that know nothing about HTTP**; one
+  filter maps them to status codes and a single response shape.
 
 ## Decisions and assumptions
 
@@ -48,7 +116,7 @@ The brief leaves several points open. Each choice below is deliberate.
 
 | Question | Decision | Why |
 |---|---|---|
-| How is "same duck" kept unique under concurrent adds? | A unique index on (color, size, price, active flag) plus one `INSERT ... ON DUPLICATE KEY UPDATE` statement. | The database enforces the rule, so no request ordering can break it and no application-level lock is needed. |
+| How is "same duck" kept unique under concurrent adds? | A unique index on (color, size, price, active flag). An add first tries an atomic increment on the existing duck; if there is none it runs one `INSERT ... ON DUPLICATE KEY UPDATE`, which the index turns into a merge if another request got there first. | The database enforces the rule, so no request ordering can break it and no application-level lock is needed. |
 | Price is a "Double" in the brief. | Stored as `DECIMAL(10,2)`; handled in code as whole cents. Prices with more than two decimals are rejected. | Merging needs exact equality on price, and floating point cannot give that. |
 | Does a deleted duck count as "already exists"? | No. Adding a duck that matches only a deleted one creates a new record. | Deleted stock is gone; reviving it would bring back its old quantity. |
 | What if an edit changes the price to one another active duck of the same color and size already has? | Refused with `409 DUCK_PRICE_CONFLICT`. | It would create the duplicate the merge rule forbids. Merging the two records silently would be a surprising side effect of an edit. |
@@ -58,7 +126,7 @@ The brief leaves several points open. Each choice below is deliberate.
 | Limits | Add: quantity 1 to 1,000,000. Edit: quantity 0 and up. Price above 0, at most 999,999.99. | Adding zero is not an addition; a duck can be out of stock. |
 | Unknown fields in a request | Rejected with 400, not ignored. | Sending `color` on an edit should fail loudly, since color cannot be edited. |
 | Deleting a deleted duck | `404`. | From the API's point of view it no longer exists. |
-| Ids after a merge | May skip numbers. | MySQL reserves an id before it knows the insert will merge. Ids stay unique and stable. |
+| Gaps in ids | Possible, but only when several requests race to create the same new duck. | MySQL reserves an id for every attempted insert, including one that ends up merging. The increment-first step keeps ordinary merges from using ids. Ids stay unique and stable. |
 
 ### Store
 
@@ -135,3 +203,22 @@ The second call answers:
   "currency": "USD"
 }
 ```
+
+## What is deliberately left out
+
+- **A store UI, order records, stock reservation, authentication, pagination.**
+  None is asked for; the brief asks for depth over breadth.
+- **A shared package for the color and size lists.** The frontend repeats two
+  short lists; the API validates everything regardless.
+
+## What I would do next
+
+- Place orders: a second endpoint that decrements stock atomically and records the order.
+- ISO country codes for destinations instead of free-text names.
+- Pagination and filtering on the listing once the warehouse grows.
+- Run the test suites in CI.
+
+## A note on tools
+
+AI assistance (Claude Code) was used in building this, as the brief allows.
+The design decisions above are mine to explain and defend.

@@ -1,3 +1,6 @@
+# The whole application:   docker compose up --build
+# Only the database (for local development and tests):   docker compose up -d mysql
+
 services:
   mysql:
     image: mysql:8.4
@@ -17,6 +20,34 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      PORT: 3000
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${MYSQL_USER:-duck}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-duck_local_only}
+      DB_NAME: ${MYSQL_DATABASE:-duckstore}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   mysql-data:
