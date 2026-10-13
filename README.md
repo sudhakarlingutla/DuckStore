@@ -139,7 +139,7 @@ The brief leaves several points open. Each choice below is deliberate.
 
 | Question | Decision | Why |
 |---|---|---|
-| Is each percentage taken of the base cost or of the running total? | Of the running total, in the order the brief lists the rules. Each breakdown line states the amount it was calculated on. | The brief lists the rules as an ordered sequence acting on "the total cost". The order only means something if each rule sees the result of the ones before it. The other reading is a one-line change in each rule (pass the base cost instead of the running total). |
+| Is each percentage taken of the base cost or of the running total? | Of the running total, in the order the brief lists the rules. Each breakdown line states the amount it was calculated on. | The brief lists the rules as an ordered sequence acting on "the total cost". The order only means something if each rule sees the result of the ones before it. The other reading is a one-line change in the pricing engine: pass the base cost to each rule instead of the running total. |
 | Are shipping charges subject to the percentages? | No. Shipping is added last. | It is listed last, and it is a flat or per-unit amount rather than a share of the goods' cost. |
 | The air discount | 15% of the air charge only, shown as its own line. | The brief says "reduce the air charge by 15%". |
 | Thresholds | "More than 100" and "exceeds 1000" are strict: 100 and 1000 units get no discount. | Literal reading. |
