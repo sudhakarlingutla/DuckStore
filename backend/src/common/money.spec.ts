@@ -50,12 +50,11 @@ describe('Money', () => {
       expect(total.percent(20).cents).toBe(19_999_999_800_000);
     });
 
-    it('adds, subtracts and negates', () => {
+    it('adds and negates', () => {
       const ten = Money.fromNumber(10);
       const three = Money.fromNumber(3);
 
       expect(ten.plus(three).toNumber()).toBe(13);
-      expect(ten.minus(three).toNumber()).toBe(7);
       expect(three.negated().toNumber()).toBe(-3);
     });
   });

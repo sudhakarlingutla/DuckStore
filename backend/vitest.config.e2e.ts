@@ -1,9 +1,7 @@
 import { defineConfig } from 'vitest/config';
-import tsconfigPaths from 'vite-tsconfig-paths';
 
 // Tests that need a real MySQL. Start it first: docker compose up -d mysql
 export default defineConfig({
-  plugins: [tsconfigPaths()],
   test: {
     globals: true,
     root: './',

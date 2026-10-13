@@ -19,8 +19,6 @@ export function hasAtMostTwoDecimals(value: number): boolean {
 export class Money {
   private constructor(readonly cents: number) {}
 
-  static readonly ZERO = new Money(0);
-
   static fromCents(cents: number): Money {
     if (!Number.isSafeInteger(cents)) {
       throw new RangeError(`Not a whole number of cents: ${cents}`);
@@ -51,10 +49,6 @@ export class Money {
     return Money.fromCents(this.cents + other.cents);
   }
 
-  minus(other: Money): Money {
-    return Money.fromCents(this.cents - other.cents);
-  }
-
   negated(): Money {
     return Money.fromCents(-this.cents);
   }
@@ -78,10 +72,6 @@ export class Money {
       throw new RangeError('Cannot take a percentage of a negative amount');
     }
     return Money.fromCents(Math.floor((this.cents * percentage + 50) / 100));
-  }
-
-  equals(other: Money): boolean {
-    return this.cents === other.cents;
   }
 
   /** For JSON responses, e.g. 7982.4. */

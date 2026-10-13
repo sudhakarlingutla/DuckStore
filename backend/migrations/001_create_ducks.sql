@@ -19,8 +19,6 @@ CREATE TABLE ducks (
   -- Incremented on every write; lets an edit detect that it is stale.
   version    INT UNSIGNED NOT NULL DEFAULT 1,
   active_key TINYINT GENERATED ALWAYS AS (IF(deleted, NULL, 1)) VIRTUAL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
   PRIMARY KEY (id),
   UNIQUE KEY uq_ducks_active_identity (color, size, price, active_key),
