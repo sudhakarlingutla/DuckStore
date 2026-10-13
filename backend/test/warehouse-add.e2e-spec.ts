@@ -79,6 +79,17 @@ describe('POST /api/ducks', () => {
       expect(await storedDucks(pool)).toHaveLength(1);
     });
 
+    it('does not use up ids, so the next new duck gets the next id', async () => {
+      const first = await addDuck(redLarge).expect(201);
+      await addDuck(redLarge).expect(200);
+      await addDuck(redLarge).expect(200);
+      await addDuck(redLarge).expect(200);
+
+      const next = await addDuck({ ...redLarge, color: 'Green' }).expect(201);
+
+      expect(next.body.id).toBe(first.body.id + 1);
+    });
+
     it('is merged however the price is written', async () => {
       await addDuck({ ...redLarge, price: 10 }).expect(201);
       await addDuck({ ...redLarge, price: 10.0 }).expect(200);

@@ -15,15 +15,32 @@ import {
 const DUCK_COLUMNS = 'id, color, size, price, quantity, version';
 
 /**
- * Insert the duck, or, if an active duck with the same color, size and price
- * already exists, add to its quantity. This is ONE statement, so the database
- * runs it atomically: two simultaneous requests for the same duck cannot both
- * insert, and neither increment can be lost. The duplicate is detected by the
- * unique index uq_ducks_active_identity (see migrations/001_create_ducks.sql).
+ * Adding stock is done in up to two statements, each atomic on its own.
  *
- * `id = LAST_INSERT_ID(ducks.id)` makes the driver report the existing row's
- * id when the statement merged instead of inserting.
+ * 1. MERGE_INTO_EXISTING_SQL adds to the active duck with this color, size
+ *    and price, if there is one. This is the common case.
+ *
+ * 2. If there was none, ADD_OR_MERGE_SQL inserts it. Another request may have
+ *    inserted the same duck in the meantime; the unique index
+ *    uq_ducks_active_identity (see migrations/001_create_ducks.sql) detects
+ *    that, and the statement adds to that duck instead of inserting. So two
+ *    simultaneous requests can never create two records, and no increment is
+ *    ever lost.
+ *
+ * Statement 2 alone would be correct. Statement 1 is there because MySQL
+ * reserves an auto-increment id for every attempted insert, even one that
+ * ends up merging; going through it for every merge would leave large gaps
+ * in the ids.
+ *
+ * `id = LAST_INSERT_ID(id)` makes the driver report which row was updated.
  */
+const MERGE_INTO_EXISTING_SQL = `
+  UPDATE ducks
+     SET quantity = quantity + ?,
+         version  = version + 1,
+         id       = LAST_INSERT_ID(id)
+   WHERE color = ? AND size = ? AND price = ? AND deleted = FALSE`;
+
 const ADD_OR_MERGE_SQL = `
   INSERT INTO ducks (color, size, price, quantity)
   VALUES (?, ?, ?, ?) AS incoming
@@ -32,7 +49,8 @@ const ADD_OR_MERGE_SQL = `
     version  = ducks.version + 1,
     id       = LAST_INSERT_ID(ducks.id)`;
 
-// MySQL reports 1 affected row for an insert and 2 for a merge.
+// For ADD_OR_MERGE_SQL, MySQL reports 1 affected row for an insert and 2
+// for a merge.
 const AFFECTED_ROWS_WHEN_INSERTED = 1;
 
 interface DuckRow extends RowDataPacket {
@@ -137,28 +155,43 @@ export class DucksRepository implements StockReader {
   }
 
   async addOrMerge(stock: IncomingStock): Promise<AddResult> {
-    const result = await this.runAddOrMerge(stock);
+    const { id, created } = await this.writeStock(stock);
     const [rows] = await this.pool.execute<DuckRow[]>(
       `SELECT ${DUCK_COLUMNS} FROM ducks WHERE id = ?`,
-      [result.insertId],
+      [id],
     );
-    return {
-      duck: toDuck(rows[0]),
-      created: result.affectedRows === AFFECTED_ROWS_WHEN_INSERTED,
-    };
+    return { duck: toDuck(rows[0]), created };
   }
 
-  private async runAddOrMerge(stock: IncomingStock): Promise<ResultSetHeader> {
+  private async writeStock(
+    stock: IncomingStock,
+  ): Promise<{ id: number; created: boolean }> {
+    const price = stock.price.toDecimalString();
     try {
-      const [result] = await retryOnDeadlock(() =>
+      const [merged] = await retryOnDeadlock(() =>
+        this.pool.execute<ResultSetHeader>(MERGE_INTO_EXISTING_SQL, [
+          stock.quantity,
+          stock.color,
+          stock.size,
+          price,
+        ]),
+      );
+      if (merged.affectedRows === 1) {
+        return { id: merged.insertId, created: false };
+      }
+
+      const [added] = await retryOnDeadlock(() =>
         this.pool.execute<ResultSetHeader>(ADD_OR_MERGE_SQL, [
           stock.color,
           stock.size,
-          stock.price.toDecimalString(),
+          price,
           stock.quantity,
         ]),
       );
-      return result;
+      return {
+        id: added.insertId,
+        created: added.affectedRows === AFFECTED_ROWS_WHEN_INSERTED,
+      };
     } catch (error) {
       if (
         hasMysqlCode(error, 'ER_WARN_DATA_OUT_OF_RANGE', 'ER_DATA_OUT_OF_RANGE')
