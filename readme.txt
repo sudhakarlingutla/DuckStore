@@ -100,15 +100,36 @@ UI tests:
 TRY THE API
 -----------
 
-Add a duck:
+The "samples" folder holds ready-made requests. Run these from the
+repository root. They work the same in PowerShell, the Windows command
+prompt and bash. (In the old Windows PowerShell 5, type curl.exe instead of
+curl.)
 
-    curl -X POST http://localhost:3000/api/ducks -H "Content-Type: application/json" -d "{\"color\":\"Red\",\"size\":\"Large\",\"price\":10,\"quantity\":5000}"
+Add four ducks:
 
-Price an order:
+    curl -X POST http://localhost:3000/api/ducks -H "Content-Type: application/json" -d "@samples/duck-red-large.json"
+    curl -X POST http://localhost:3000/api/ducks -H "Content-Type: application/json" -d "@samples/duck-red-large-dearer.json"
+    curl -X POST http://localhost:3000/api/ducks -H "Content-Type: application/json" -d "@samples/duck-yellow-medium.json"
+    curl -X POST http://localhost:3000/api/ducks -H "Content-Type: application/json" -d "@samples/duck-black-xsmall.json"
 
-    curl -X POST http://localhost:3000/api/orders/price -H "Content-Type: application/json" -d "{\"color\":\"Red\",\"size\":\"Large\",\"quantity\":200,\"destinationCountry\":\"USA\",\"shippingMode\":\"Air\"}"
+List them:
 
-The second call answers with a total of 7982.4.
+    curl http://localhost:3000/api/ducks
+
+Price three orders:
+
+    curl -X POST http://localhost:3000/api/orders/price -H "Content-Type: application/json" -d "@samples/order-usa-air.json"
+    curl -X POST http://localhost:3000/api/orders/price -H "Content-Type: application/json" -d "@samples/order-bolivia-sea.json"
+    curl -X POST http://localhost:3000/api/orders/price -H "Content-Type: application/json" -d "@samples/order-france-air-bulk.json"
+
+With only the sample ducks in the warehouse, the totals are:
+
+    order-usa-air           200 Red Large     -> 7982.40
+    order-bolivia-sea       10 Yellow Medium  -> 483.90
+    order-france-air-bulk   1001 Black XSmall -> 28554.40
+
+Red Large exists at two prices (10 and 12.50). The order is priced from the
+cheaper one, because it has enough stock.
 
 Endpoints (all under /api):
 

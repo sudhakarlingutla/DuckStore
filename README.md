@@ -182,13 +182,17 @@ Every error has the same shape:
 
 ### Try it
 
-```
-curl -X POST http://localhost:3000/api/ducks -H "Content-Type: application/json" \
-  -d '{"color":"Red","size":"Large","price":10,"quantity":5000}'
+The `samples` folder holds ready-made requests. Sending a file avoids
+shell-specific quoting, so these lines work unchanged in PowerShell, the
+Windows command prompt and bash. Run them from the repository root.
 
-curl -X POST http://localhost:3000/api/orders/price -H "Content-Type: application/json" \
-  -d '{"color":"Red","size":"Large","quantity":200,"destinationCountry":"USA","shippingMode":"Air"}'
 ```
+curl -X POST http://localhost:3000/api/ducks -H "Content-Type: application/json" -d "@samples/duck-red-large.json"
+
+curl -X POST http://localhost:3000/api/orders/price -H "Content-Type: application/json" -d "@samples/order-usa-air.json"
+```
+
+`readme.txt` lists all the sample requests and the totals to expect.
 
 The second call answers:
 
