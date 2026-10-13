@@ -224,8 +224,3 @@ The second call answers:
 - ISO country codes for destinations instead of free-text names.
 - Pagination and filtering on the listing once the warehouse grows.
 - Run the test suites in CI.
-
-## A note on tools
-
-AI assistance (Claude Code) was used in building this, as the brief allows.
-The design decisions above are mine to explain and defend.
